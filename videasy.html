@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIDEASY – Universal Search + Episodes</title>
+  <style>
+    :root { --bg:#0f1115; --fg:#eaeef2; --muted:#9aa4b2; --card:#171a21; --accent:#8B5CF6; }
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    header{padding:18px 16px;text-align:center}
+    h1{margin:0;font-size:22px}
+    .sub{color:var(--muted);font-size:13px;margin-top:6px}
+    #searchBar{display:flex;gap:8px;justify-content:center;align-items:center;padding:12px 16px;flex-wrap:wrap}
+    #q{min-width:280px;width:560px;max-width:90vw;padding:10px 12px;border-radius:10px;border:1px solid #232835;background:var(--card);color:var(--fg);outline:none}
+    button.primary{background:var(--accent);border:none;color:white;padding:10px 14px;border-radius:10px;cursor:pointer}
+    button.primary:hover{filter:brightness(1.1)}
+
+    #results{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;padding:16px;max-width:1200px;margin:0 auto}
+    .card{background:var(--card);border:1px solid #232835;border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .15s ease, box-shadow .15s ease}
+    .card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,.35)}
+    .poster{width:100%;aspect-ratio:2/3;object-fit:cover;background:#0b0d12}
+    .meta{padding:8px 10px}
+    .title{font-size:14px;line-height:1.3;min-height:2.6em}
+    .badge{display:inline-block;margin-top:6px;font-size:11px;color:#c7d2fe;border:1px solid #2b2f3a;background:#1b1f2a;border-radius:999px;padding:2px 8px}
+
+    #playerWrap{max-width:1100px;margin:8px auto 28px;padding:0 16px;display:none}
+    #playerHeader{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0 10px}
+    #playerTitle{font-size:18px}
+    .openLink{font-size:12px;color:#c7d2fe;text-decoration:none;border:1px solid #2b2f3a;border-radius:8px;padding:6px 10px}
+    .openLink:hover{background:#1b1f2a}
+
+    /* 16:9 responsive iframe container */
+    .iframeBox{position:relative;padding-bottom:56.25%;height:0;border-radius:16px;overflow:hidden;border:1px solid #232835;background:#0b0d12}
+    .iframeBox iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+
+    .controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px}
+    .controls button{background:#2a2f3a;border:1px solid #3b4251;color:#fff;padding:8px 12px;border-radius:10px;cursor:pointer}
+    .controls button:hover{background:#394053}
+    .label{color:var(--muted);font-size:13px}
+    .num{min-width:46px;text-align:center}
+
+    #log{max-width:1100px;margin:0 auto 24px;color:#93a2b8;font-size:12px;white-space:pre-wrap;padding:0 16px}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>TMDB ID Finder</h1>
+    <div class="sub">Search movies, TV shows & anime.</div>
+  </header>
+
+  <div id="searchBar">
+    <input id="q" placeholder="Search Here" onkeydown="if(event.key==='Enter') runSearch()" />
+    <button class="primary" onclick="runSearch()">Search</button>
+  </div>
+
+  <section id="results"></section>
+
+  <section id="playerWrap">
+    <div id="playerHeader">
+      <div id="playerTitle"></div>
+      <a id="openNewTab" class="openLink" target="_blank" rel="noopener">Open in new tab ↗</a>
+    </div>
+
+    <div class="iframeBox">
+      <iframe id="player" allow="autoplay; encrypted-media; fullscreen; picture-in-picture"></iframe>
+    </div>
+
+    <div class="controls" id="epControls" style="display:none">
+      <button id="prevBtn" onclick="prevEpisode()">⬅ Prev</button>
+      <span class="label" id="epLabel">Episode</span>
+      <button id="nextBtn" onclick="nextEpisode()">Next ➡</button>
+      <span class="label" id="seasonUi" style="display:none">| Season <input class="num" id="seasonInput" type="number" min="1" value="1" onchange="jumpSeason(this.value)" /></span>
+      <span class="label" id="hint"></span>
+    </div>
+  </section>
+
+  <pre id="log"></pre>
+
+  <!-- Fuse.js for typo tolerance -->
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.min.js"></script>
+  <script>
+    // ===== Config =====
+    const TMDB_KEY = "3ee53678071868d3039087957e7bb78b";
+    const IMG = (p) => p ? (p.startsWith('http') ? p : `https://image.tmdb.org/t/p/w342${p}`) : '';
+
+    // ===== App state =====
+    const state = {
+      type: null,     // 'movie' | 'tv' | 'anime'
+      id: null,       // TMDB id for movie/tv, AniList id for anime
+      title: '',
+      season: 1,
+      episode: 1,
+      totalEpisodes: null,   // for TV (per season) or Anime (overall if available)
+      animeDub: false,
+      lastAutoAdvance: 0,
+    };
+
+    const els = {
+      results: document.getElementById('results'),
+      playerWrap: document.getElementById('playerWrap'),
+      player: document.getElementById('player'),
+      playerTitle: document.getElementById('playerTitle'),
+      openNewTab: document.getElementById('openNewTab'),
+      epControls: document.getElementById('epControls'),
+      epLabel: document.getElementById('epLabel'),
+      seasonUi: document.getElementById('seasonUi'),
+      seasonInput: document.getElementById('seasonInput'),
+      hint: document.getElementById('hint'),
+      log: document.getElementById('log'),
+    };
+
+    function log(msg){
+      els.log.textContent = String(msg);
+      console.log('[VIDEASY]', msg);
+    }
+
+    async function runSearch(){
+      const query = document.getElementById('q').value.trim();
+      if(!query) return;
+      els.results.innerHTML = '<div class="sub" style="grid-column:1/-1;text-align:center">Searching…</div>';
+
+      // TMDB multi (movies + tv)
+      const tmdbUrl = `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_KEY}&query=${encodeURIComponent(query)}`;
+      const [tmdbResp, animeResp] = await Promise.all([
+        fetch(tmdbUrl).then(r=>r.json()).catch(()=>({results:[]})),
+        // AniList GraphQL search
+        fetch('https://graphql.anilist.co', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: `query($search:String){ Page(perPage:24){ media(search:$search, type:ANIME){ id title{romaji english} coverImage{large} } } }`,
+            variables: { search: query }
+          })
+        }).then(r=>r.json()).catch(()=>({data:{Page:{media:[]}}}))
+      ]);
+
+      const tmdbItems = (tmdbResp.results||[]).filter(x=>['movie','tv'].includes(x.media_type));
+      const animeItems = ((animeResp?.data?.Page?.media)||[]).map(a=>({
+        id: a.id,
+        title: a.title.english || a.title.romaji,
+        poster_path: a.coverImage.large,
+        media_type: 'anime'
+      }));
+
+      // Combine and fuzzy sort
+      const all = [
+        ...tmdbItems.map(x=>({ id:x.id, title:x.title||x.name, poster_path:x.poster_path, media_type:x.media_type })),
+        ...animeItems
+      ];
+
+      const fuse = new Fuse(all, { keys:['title'], threshold:0.4 });
+      const ordered = fuse.search(query).map(r=>r.item);
+      renderResults(ordered.length?ordered:all);
+    }
+
+    function renderResults(items){
+      els.results.innerHTML = '';
+      if(!items.length){
+        els.results.innerHTML = '<div class="sub" style="grid-column:1/-1;text-align:center">No results. Try another spelling.</div>';
+        return;
+      }
+      for(const it of items){
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.onclick = ()=>openItem(it);
+        card.innerHTML = `
+          <img class="poster" src="${IMG(it.poster_path)}" alt="${escapeHtml(it.title)}" />
+          <div class="meta">
+            <div class="title">${escapeHtml(it.title)}</div>
+            <div class="badge">${it.media_type.toUpperCase()}</div>
+          </div>`;
+        els.results.appendChild(card);
+      }
+    }
+
+    function openItem(it){
+      // reset state
+      state.type = it.media_type; state.id = it.id; state.title = it.title; state.season = 1; state.episode = 1; state.totalEpisodes = null; state.lastAutoAdvance = 0;
+
+      els.playerTitle.textContent = `${it.title} · ${it.media_type.toUpperCase()}`;
+      els.playerWrap.style.display = 'block';
+
+      if(state.type === 'movie'){
+        const url = `https://player.videasy.net/movie/${state.id}`;
+        setPlayer(url);
+        els.epControls.style.display = 'none';
+        els.openNewTab.href = url;
+        els.hint.textContent = '';
+      } else if(state.type === 'tv'){
+        els.seasonUi.style.display = '';
+        els.seasonInput.value = String(state.season);
+        fetchSeasonAndPlay();
+      } else if(state.type === 'anime'){
+        els.seasonUi.style.display = 'none';
+        fetchAnimeEpisodesAndPlay();
+      }
+    }
+
+    async function fetchSeasonAndPlay(){
+      try{
+        const seasonUrl = `https://api.themoviedb.org/3/tv/${state.id}/season/${state.season}?api_key=${TMDB_KEY}`;
+        const r = await fetch(seasonUrl);
+        if(!r.ok){
+          if(state.season>1){ // fallback back to season 1
+            state.season = 1; els.seasonInput.value = '1';
+            return fetchSeasonAndPlay();
+          }
+          throw new Error('TMDB season fetch failed');
+        }
+        const data = await r.json();
+        state.totalEpisodes = (data.episodes||[]).length || null;
+        playCurrent();
+      }catch(err){
+        log(err.message || err);
+        state.totalEpisodes = null; // unknown length
+        playCurrent();
+      }
+    }
+
+    async function fetchAnimeEpisodesAndPlay(){
+      try{
+        const r = await fetch('https://graphql.anilist.co', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ query:`query($id:Int){ Media(id:$id, type:ANIME){ episodes } }`, variables:{ id: state.id } })
+        });
+        const j = await r.json();
+        state.totalEpisodes = j?.data?.Media?.episodes || null;
+      }catch{ /* ignore */ }
+      playCurrent();
+    }
+
+    function playCurrent(){
+      let url = '';
+      if(state.type==='tv'){
+        url = `https://player.videasy.net/tv/${state.id}/${state.season}/${state.episode}?nextEpisode=true&autoplayNextEpisode=true&episodeSelector=true&color=8B5CF6`;
+        els.epControls.style.display = '';
+        els.epLabel.textContent = `Season ${state.season} • Episode ${state.episode}`;
+        els.hint.textContent = state.totalEpisodes?`of ${state.totalEpisodes}`:'';
+      } else if(state.type==='anime'){
+        url = `https://player.videasy.net/anime/${state.id}/${state.episode}?dub=${state.animeDub}`;
+        els.epControls.style.display = '';
+        els.epLabel.textContent = `Episode ${state.episode}`;
+        els.hint.textContent = state.totalEpisodes?`of ${state.totalEpisodes}`:'';
+      }
+      els.openNewTab.href = url || els.openNewTab.href;
+      setPlayer(url);
+    }
+
+    function setPlayer(url){
+      // Render iframe
+      els.player.src = url;
+    }
+
+    // Episode navigation
+    function nextEpisode(){
+      if(state.type==='tv'){
+        if(state.totalEpisodes && state.episode >= state.totalEpisodes){
+          state.season += 1; state.episode = 1; els.seasonInput.value = String(state.season); fetchSeasonAndPlay(); return;
+        }
+        state.episode += 1; playCurrent();
+      } else if(state.type==='anime'){
+        if(state.totalEpisodes && state.episode >= state.totalEpisodes){ return; }
+        state.episode += 1; playCurrent();
+      }
+    }
+
+    function prevEpisode(){
+      if(state.episode>1){ state.episode -= 1; playCurrent(); return; }
+      if(state.type==='tv' && state.season>1){ state.season -= 1; els.seasonInput.value = String(state.season); fetchSeasonAndPlay(); }
+    }
+
+    function jumpSeason(val){
+      const n = Math.max(1, parseInt(val||'1',10));
+      state.season = n; state.episode = 1; fetchSeasonAndPlay();
+    }
+
+    // ===== Auto-next based on VIDEASY postMessage events =====
+    window.addEventListener('message', (event)=>{
+      try{
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if(!data) return;
+        // Expecting: { id, type, progress, timestamp, duration, season, episode }
+        if((data.type==='tv' || data.type==='anime') && (typeof data.progress==='number')){
+          // advance once when >=98%
+          if(data.progress >= 98){
+            const now = Date.now();
+            if(now - state.lastAutoAdvance > 3000){
+              state.lastAutoAdvance = now;
+              nextEpisode();
+            }
+          }
+        } else if(typeof data.timestamp==='number' && typeof data.duration==='number' && data.duration>0){
+          const pct = (data.timestamp/data.duration)*100;
+          if(pct>=98){
+            const now = Date.now();
+            if(now - state.lastAutoAdvance > 3000){
+              state.lastAutoAdvance = now;
+              nextEpisode();
+            }
+          }
+        }
+      }catch(e){ /* ignore parse errors */ }
+    });
+
+    // Minimal HTML escaping for titles
+    function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+  </script>
+</body>
+</html>
