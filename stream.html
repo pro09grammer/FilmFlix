@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIDEASY – Universal Search + Episodes</title>
+  <style>
+    /* Common styles for both versions */
+    :root { 
+      --bg:#0f1115; 
+      --fg:#eaeef2; 
+      --muted:#9aa4b2; 
+      --card:#171a21; 
+      --accent:#8B5CF6; 
+    }
+    
+    html, body {
+      margin:0;
+      padding:0;
+      background:var(--bg);
+      color:var(--fg);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    }
+    
+    /* TV-specific styles */
+    .tv-version {
+      font-size: 20px;
+    }
+    
+    .tv-version header {
+      padding: 30px 20px;
+      text-align:center;
+    }
+    
+    .tv-version h1 {
+      margin:0;
+      font-size: 36px;
+      font-weight: 600;
+    }
+    
+    .tv-version .sub {
+      color:var(--muted);
+      font-size: 24px;
+      margin-top: 12px;
+    }
+    
+    .tv-version #searchBar {
+      display:flex;
+      gap: 16px;
+      justify-content:center;
+      align-items:center;
+      padding: 20px 16px;
+      flex-wrap:wrap;
+    }
+    
+    .tv-version #q {
+      min-width: 400px;
+      width: 700px;
+      max-width: 90vw;
+      padding: 18px 20px;
+      border-radius: 14px;
+      border: 2px solid #232835;
+      background:var(--card);
+      color:var(--fg);
+      outline:none;
+      font-size: 22px;
+    }
+    
+    .tv-version button.primary {
+      background:var(--accent);
+      border:none;
+      color:white;
+      padding: 18px 24px;
+      border-radius: 14px;
+      cursor:pointer;
+      font-size: 22px;
+      font-weight: 500;
+    }
+    
+    .tv-version button.primary:hover, .tv-version button.primary:focus {
+      filter:brightness(1.1);
+      outline: 2px solid white;
+    }
+
+    .tv-version #results {
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+      gap: 24px;
+      padding: 24px;
+      max-width: 1400px;
+      margin:0 auto;
+    }
+    
+    .tv-version .card {
+      background:var(--card);
+      border: 2px solid #232835;
+      border-radius: 18px;
+      overflow:hidden;
+      cursor:pointer;
+      transition:transform .15s ease, box-shadow .15s ease;
+    }
+    
+    .tv-version .card:hover, .tv-version .card:focus {
+      transform:translateY(-4px);
+      box-shadow:0 12px 32px rgba(0,0,0,.5);
+      outline: 2px solid var(--accent);
+    }
+    
+    .tv-version .poster {
+      width:100%;
+      aspect-ratio:2/3;
+      object-fit:cover;
+      background:#0b0d12;
+    }
+    
+    .tv-version .meta {
+      padding: 16px 14px;
+    }
+    
+    .tv-version .title {
+      font-size: 20px;
+      line-height:1.3;
+      min-height: 2.6em;
+      font-weight: 500;
+    }
+    
+    .tv-version .badge {
+      display:inline-block;
+      margin-top: 10px;
+      font-size: 16px;
+      color:#c7d2fe;
+      border: 1px solid #2b2f3a;
+      background:#1b1f2a;
+      border-radius:999px;
+      padding: 6px 12px;
+    }
+
+    .tv-version #playerWrap {
+      max-width: 1300px;
+      margin: 20px auto 40px;
+      padding:0 20px;
+      display:none;
+    }
+    
+    .tv-version #playerHeader {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 16px;
+      margin: 12px 0 20px;
+    }
+    
+    .tv-version #playerTitle {
+      font-size: 28px;
+      font-weight: 500;
+    }
+    
+    .tv-version .openLink {
+      font-size: 18px;
+      color:#c7d2fe;
+      text-decoration:none;
+      border: 1px solid #2b2f3a;
+      border-radius: 12px;
+      padding: 10px 16px;
+    }
+    
+    .tv-version .openLink:hover, .tv-version .openLink:focus {
+      background:#1b1f2a;
+      outline: 2px solid white;
+    }
+
+    .tv-version .iframeBox {
+      position:relative;
+      padding-bottom:56.25%;
+      height:0;
+      border-radius: 20px;
+      overflow:hidden;
+      border: 2px solid #232835;
+      background:#0b0d12;
+    }
+    
+    .tv-version .iframeBox iframe {
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      border:0;
+    }
+
+    .tv-version .controls {
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      gap: 16px;
+      margin-top: 20px;
+    }
+    
+    .tv-version .controls button {
+      background:#2a2f3a;
+      border: 2px solid #3b4251;
+      color:#fff;
+      padding: 14px 20px;
+      border-radius: 14px;
+      cursor:pointer;
+      font-size: 20px;
+    }
+    
+    .tv-version .controls button:hover, .tv-version .controls button:focus {
+      background:#394053;
+      outline: 2px solid white;
+    }
+    
+    .tv-version .label {
+      color:var(--muted);
+      font-size: 20px;
+    }
+    
+    .tv-version .num {
+      min-width: 70px;
+      text-align:center;
+      font-size: 20px;
+      padding: 8px;
+      border-radius: 8px;
+      border: 2px solid #3b4251;
+      background: #2a2f3a;
+      color: white;
+    }
+
+    .tv-version #log {
+      max-width: 1300px;
+      margin:0 auto 32px;
+      color:#93a2b8;
+      font-size: 18px;
+      white-space:pre-wrap;
+      padding:0 20px;
+    }
+
+    /* Laptop-specific styles */
+    .laptop-version header {
+      padding:18px 16px;
+      text-align:center;
+    }
+    
+    .laptop-version h1 {
+      margin:0;
+      font-size:22px;
+    }
+    
+    .laptop-version .sub {
+      color:var(--muted);
+      font-size:13px;
+      margin-top:6px;
+    }
+    
+    .laptop-version #searchBar {
+      display:flex;
+      gap:8px;
+      justify-content:center;
+      align-items:center;
+      padding:12px 16px;
+      flex-wrap:wrap;
+    }
+    
+    .laptop-version #q {
+      min-width:280px;
+      width:560px;
+      max-width:90vw;
+      padding:10px 12px;
+      border-radius:10px;
+      border:1px solid #232835;
+      background:var(--card);
+      color:var(--fg);
+      outline:none;
+    }
+    
+    .laptop-version button.primary {
+      background:var(--accent);
+      border:none;
+      color:white;
+      padding:10px 14px;
+      border-radius:10px;
+      cursor:pointer;
+    }
+    
+    .laptop-version button.primary:hover {
+      filter:brightness(1.1);
+    }
+
+    .laptop-version #results {
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+      gap:14px;
+      padding:16px;
+      max-width:1200px;
+      margin:0 auto;
+    }
+    
+    .laptop-version .card {
+      background:var(--card);
+      border:1px solid #232835;
+      border-radius:14px;
+      overflow:hidden;
+      cursor:pointer;
+      transition:transform .15s ease, box-shadow .15s ease;
+    }
+    
+    .laptop-version .card:hover {
+      transform:translateY(-2px);
+      box-shadow:0 10px 24px rgba(0,0,0,.35);
+    }
+    
+    .laptop-version .poster {
+      width:100%;
+      aspect-ratio:2/3;
+      object-fit:cover;
+      background:#0b0d12;
+    }
+    
+    .laptop-version .meta {
+      padding:8px 10px;
+    }
+    
+    .laptop-version .title {
+      font-size:14px;
+      line-height:1.3;
+      min-height:2.6em;
+    }
+    
+    .laptop-version .badge {
+      display:inline-block;
+      margin-top:6px;
+      font-size:11px;
+      color:#c7d2fe;
+      border:1px solid #2b2f3a;
+      background:#1b1f2a;
+      border-radius:999px;
+      padding:2px 8px;
+    }
+
+    .laptop-version #playerWrap {
+      max-width:1100px;
+      margin:8px auto 28px;
+      padding:0 16px;
+      display:none;
+    }
+    
+    .laptop-version #playerHeader {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      margin:6px 0 10px;
+    }
+    
+    .laptop-version #playerTitle {
+      font-size:18px;
+    }
+    
+    .laptop-version .openLink {
+      font-size:12px;
+      color:#c7d2fe;
+      text-decoration:none;
+      border:1px solid #2b2f3a;
+      border-radius:8px;
+      padding:6px 10px;
+    }
+    
+    .laptop-version .openLink:hover {
+      background:#1b1f2a;
+    }
+
+    .laptop-version .iframeBox {
+      position:relative;
+      padding-bottom:56.25%;
+      height:0;
+      border-radius:16px;
+      overflow:hidden;
+      border:1px solid #232835;
+      background:#0b0d12;
+    }
+    
+    .laptop-version .iframeBox iframe {
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      border:0;
+    }
+
+    .laptop-version .controls {
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      gap:10px;
+      margin-top:10px;
+    }
+    
+    .laptop-version .controls button {
+      background:#2a2f3a;
+      border:1px solid #3b4251;
+      color:#fff;
+      padding:8px 12px;
+      border-radius:10px;
+      cursor:pointer;
+    }
+    
+    .laptop-version .controls button:hover {
+      background:#394053;
+    }
+    
+    .laptop-version .label {
+      color:var(--muted);
+      font-size:13px;
+    }
+    
+    .laptop-version .num {
+      min-width:46px;
+      text-align:center;
+    }
+
+    .laptop-version #log {
+      max-width:1100px;
+      margin:0 auto 24px;
+      color:#93a2b8;
+      font-size:12px;
+      white-space:pre-wrap;
+      padding:0 16px;
+    }
+
+    /* Focus management for TV navigation */
+    .tv-version *:focus {
+      outline: 2px solid white;
+    }
+
+    /* TV-optimized scrollbar */
+    .tv-version ::-webkit-scrollbar {
+      width: 16px;
+    }
+
+    .tv-version ::-webkit-scrollbar-track {
+      background: var(--card);
+    }
+
+    .tv-version ::-webkit-scrollbar-thumb {
+      background: var(--accent);
+      border-radius: 8px;
+    }
+
+    /* Responsive adjustments for smaller TV screens */
+    @media (max-width: 1200px) {
+      .tv-version {
+        font-size: 18px;
+      }
+      
+      .tv-version h1 {
+        font-size: 32px;
+      }
+      
+      .tv-version .sub {
+        font-size: 20px;
+      }
+      
+      .tv-version #q {
+        min-width: 350px;
+        width: 600px;
+        font-size: 20px;
+      }
+      
+      .tv-version button.primary {
+        font-size: 20px;
+      }
+    }
+    
+    /* Initially hide both versions until detection completes */
+    .tv-version, .laptop-version {
+      display: none;
+    }
+    
+    /* Loading indicator */
+    #loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      font-size: 24px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading indicator -->
+  <div id="loading">Detecting your device...</div>
+  
+  <!-- TV Version -->
+  <div class="tv-version">
+    <header>
+      <h1>TMDB ID Finder</h1>
+      <div class="sub">Search movies, TV shows & anime.</div>
+    </header>
+
+    <div id="searchBar">
+      <input id="q-tv" placeholder="Search Here" onkeydown="if(event.key==='Enter') runSearch('tv')" />
+      <button class="primary" onclick="runSearch('tv')">Search</button>
+    </div>
+
+    <section id="results-tv"></section>
+
+    <section id="playerWrap-tv">
+      <div id="playerHeader-tv">
+        <div id="playerTitle-tv"></div>
+        <a id="openNewTab-tv" class="openLink" target="_blank" rel="noopener">Open in new tab ↗</a>
+      </div>
+
+      <div class="iframeBox">
+        <iframe id="player-tv" allow="autoplay; encrypted-media; fullscreen; picture-in-picture"></iframe>
+      </div>
+
+      <div class="controls" id="epControls-tv" style="display:none">
+        <button id="prevBtn-tv" onclick="prevEpisode('tv')">⬅ Prev</button>
+        <span class="label" id="epLabel-tv">Episode</span>
+        <button id="nextBtn-tv" onclick="nextEpisode('tv')">Next ➡</button>
+        <span class="label" id="seasonUi-tv" style="display:none">| Season <input class="num" id="seasonInput-tv" type="number" min="1" value="1" onchange="jumpSeason(this.value, 'tv')" /></span>
+        <span class="label" id="hint-tv"></span>
+      </div>
+    </section>
+
+    <pre id="log-tv"></pre>
+  </div>
+  
+  <!-- Laptop Version -->
+  <div class="laptop-version">
+    <header>
+      <h1>TMDB ID Finder</h1>
+      <div class="sub">Search movies, TV shows & anime.</div>
+    </header>
+
+    <div id="searchBar">
+      <input id="q-laptop" placeholder="Search Here" onkeydown="if(event.key==='Enter') runSearch('laptop')" />
+      <button class="primary" onclick="runSearch('laptop')">Search</button>
+    </div>
+
+    <section id="results-laptop"></section>
+
+    <section id="playerWrap-laptop">
+      <div id="playerHeader-laptop">
+        <div id="playerTitle-laptop"></div>
+        <a id="openNewTab-laptop" class="openLink" target="_blank" rel="noopener">Open in new tab ↗</a>
+      </div>
+
+      <div class="iframeBox">
+        <iframe id="player-laptop" allow="autoplay; encrypted-media; fullscreen; picture-in-picture"></iframe>
+      </div>
+
+      <div class="controls" id="epControls-laptop" style="display:none">
+        <button id="prevBtn-laptop" onclick="prevEpisode('laptop')">⬅ Prev</button>
+        <span class="label" id="epLabel-laptop">Episode</span>
+        <button id="nextBtn-laptop" onclick="nextEpisode('laptop')">Next ➡</button>
+        <span class="label" id="seasonUi-laptop" style="display:none">| Season <input class="num" id="seasonInput-laptop" type="number" min="1" value="1" onchange="jumpSeason(this.value, 'laptop')" /></span>
+        <span class="label" id="hint-laptop"></span>
+      </div>
+    </section>
+
+    <pre id="log-laptop"></pre>
+  </div>
+
+  <!-- Fuse.js for typo tolerance -->
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.min.js"></script>
+  <script>
+    // ===== Config =====
+    const TMDB_KEY = "3ee53678071868d3039087957e7bb78b";
+    const IMG = (p) => p ? (p.startsWith('http') ? p : `https://image.tmdb.org/t/p/w342${p}`) : '';
+
+    // ===== Device Detection =====
+    function detectDeviceType() {
+      const userAgent = navigator.userAgent.toLowerCase();
+      const screenWidth = window.screen.width;
+      const screenHeight = window.screen.height;
+      
+      // Check for TV-specific user agents
+      const isTVUserAgent = 
+        userAgent.includes('smart-tv') || 
+        userAgent.includes('smarttv') || 
+        userAgent.includes('tv') ||
+        userAgent.includes('samsung') && userAgent.includes('tv');
+      
+      // Check for large screen (common for TVs)
+      const isLargeScreen = screenWidth >= 1920 && screenHeight >= 1080;
+      
+      // Check if the device has touch capability (less common for TVs)
+      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      
+      // Check for TV remote navigation (pointer: coarse typically means TV remote)
+      const isCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
+      
+      // Weighted scoring system
+      let score = 0;
+      if (isTVUserAgent) score += 3;
+      if (isLargeScreen) score += 2;
+      if (!hasTouch) score += 1;
+      if (isCoarsePointer) score += 2;
+      
+      console.log('Device detection score:', score, {
+        isTVUserAgent, isLargeScreen, hasTouch, isCoarsePointer
+      });
+      
+      // If score is 4 or higher, consider it a TV
+      return score >= 4 ? 'tv' : 'laptop';
+    }
+    
+    // Initialize the appropriate version
+    function initializeApp() {
+      const deviceType = detectDeviceType();
+      console.log('Detected device type:', deviceType);
+      
+      // Hide loading indicator
+      document.getElementById('loading').style.display = 'none';
+      
+      // Show the appropriate version
+      document.querySelector(`.${deviceType}-version`).style.display = 'block';
+      
+      // Set the active version in the global state
+      window.activeVersion = deviceType;
+    }
+    
+    // Run device detection when page loads
+    window.addEventListener('DOMContentLoaded', initializeApp);
+
+    // ===== App state =====
+    const state = {
+      tv: {
+        type: null,     // 'movie' | 'tv' | 'anime'
+        id: null,       // TMDB id for movie/tv, AniList id for anime
+        title: '',
+        season: 1,
+        episode: 1,
+        totalEpisodes: null,   // for TV (per season) or Anime (overall if available)
+        animeDub: false,
+        lastAutoAdvance: 0,
+      },
+      laptop: {
+        type: null,     // 'movie' | 'tv' | 'anime'
+        id: null,       // TMDB id for movie/tv, AniList id for anime
+        title: '',
+        season: 1,
+        episode: 1,
+        totalEpisodes: null,   // for TV (per season) or Anime (overall if available)
+        animeDub: false,
+        lastAutoAdvance: 0,
+      }
+    };
+
+    function getEls(version) {
+      return {
+        results: document.getElementById(`results-${version}`),
+        playerWrap: document.getElementById(`playerWrap-${version}`),
+        player: document.getElementById(`player-${version}`),
+        playerTitle: document.getElementById(`playerTitle-${version}`),
+        openNewTab: document.getElementById(`openNewTab-${version}`),
+        epControls: document.getElementById(`epControls-${version}`),
+        epLabel: document.getElementById(`epLabel-${version}`),
+        seasonUi: document.getElementById(`seasonUi-${version}`),
+        seasonInput: document.getElementById(`seasonInput-${version}`),
+        hint: document.getElementById(`hint-${version}`),
+        log: document.getElementById(`log-${version}`),
+        searchInput: document.getElementById(`q-${version}`),
+      };
+    }
+
+    function log(msg, version = window.activeVersion){
+      const els = getEls(version);
+      els.log.textContent = String(msg);
+      console.log('[VIDEASY]', msg);
+    }
+
+    async function runSearch(version){
+      const els = getEls(version);
+      const query = els.searchInput.value.trim();
+      if(!query) return;
+      els.results.innerHTML = '<div class="sub" style="grid-column:1/-1;text-align:center">Searching…</div>';
+
+      // TMDB multi (movies + tv)
+      const tmdbUrl = `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_KEY}&query=${encodeURIComponent(query)}`;
+      const [tmdbResp, animeResp] = await Promise.all([
+        fetch(tmdbUrl).then(r=>r.json()).catch(()=>({results:[]})),
+        // AniList GraphQL search
+        fetch('https://graphql.anilist.co', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: `query($search:String){ Page(perPage:24){ media(search:$search, type:ANIME){ id title{romaji english} coverImage{large} } } }`,
+            variables: { search: query }
+          })
+        }).then(r=>r.json()).catch(()=>({data:{Page:{media:[]}}}))
+      ]);
+
+      const tmdbItems = (tmdbResp.results||[]).filter(x=>['movie','tv'].includes(x.media_type));
+      const animeItems = ((animeResp?.data?.Page?.media)||[]).map(a=>({
+        id: a.id,
+        title: a.title.english || a.title.romaji,
+        poster_path: a.coverImage.large,
+        media_type: 'anime'
+      }));
+
+      // Combine and fuzzy sort
+      const all = [
+        ...tmdbItems.map(x=>({ id:x.id, title:x.title||x.name, poster_path:x.poster_path, media_type:x.media_type })),
+        ...animeItems
+      ];
+
+      const fuse = new Fuse(all, { keys:['title'], threshold:0.4 });
+      const ordered = fuse.search(query).map(r=>r.item);
+      renderResults(ordered.length?ordered:all, version);
+    }
+
+    function renderResults(items, version){
+      const els = getEls(version);
+      els.results.innerHTML = '';
+      if(!items.length){
+        els.results.innerHTML = '<div class="sub" style="grid-column:1/-1;text-align:center">No results. Try another spelling.</div>';
+        return;
+      }
+      for(const it of items){
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.onclick = ()=>openItem(it, version);
+        card.innerHTML = `
+          <img class="poster" src="${IMG(it.poster_path)}" alt="${escapeHtml(it.title)}" />
+          <div class="meta">
+            <div class="title">${escapeHtml(it.title)}</div>
+            <div class="badge">${it.media_type.toUpperCase()}</div>
+          </div>`;
+        els.results.appendChild(card);
+      }
+    }
+
+    function openItem(it, version){
+      // reset state
+      state[version].type = it.media_type; 
+      state[version].id = it.id; 
+      state[version].title = it.title; 
+      state[version].season = 1; 
+      state[version].episode = 1; 
+      state[version].totalEpisodes = null; 
+      state[version].lastAutoAdvance = 0;
+
+      const els = getEls(version);
+      els.playerTitle.textContent = `${it.title} · ${it.media_type.toUpperCase()}`;
+      els.playerWrap.style.display = 'block';
+
+      if(state[version].type === 'movie'){
+        const url = `https://player.videasy.net/movie/${state[version].id}`;
+        setPlayer(url, version);
+        els.epControls.style.display = 'none';
+        els.openNewTab.href = url;
+        els.hint.textContent = '';
+      } else if(state[version].type === 'tv'){
+        els.seasonUi.style.display = '';
+        els.seasonInput.value = String(state[version].season);
+        fetchSeasonAndPlay(version);
+      } else if(state[version].type === 'anime'){
+        els.seasonUi.style.display = 'none';
+        fetchAnimeEpisodesAndPlay(version);
+      }
+    }
+
+    async function fetchSeasonAndPlay(version){
+      try{
+        const seasonUrl = `https://api.themoviedb.org/3/tv/${state[version].id}/season/${state[version].season}?api_key=${TMDB_KEY}`;
+        const r = await fetch(seasonUrl);
+        if(!r.ok){
+          if(state[version].season>1){ // fallback back to season 1
+            state[version].season = 1; 
+            const els = getEls(version);
+            els.seasonInput.value = '1';
+            return fetchSeasonAndPlay(version);
+          }
+          throw new Error('TMDB season fetch failed');
+        }
+        const data = await r.json();
+        state[version].totalEpisodes = (data.episodes||[]).length || null;
+        playCurrent(version);
+      }catch(err){
+        log(err.message || err, version);
+        state[version].totalEpisodes = null; // unknown length
+        playCurrent(version);
+      }
+    }
+
+    async function fetchAnimeEpisodesAndPlay(version){
+      try{
+        const r = await fetch('https://graphql.anilist.co', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ query:`query($id:Int){ Media(id:$id, type:ANIME){ episodes } }`, variables:{ id: state[version].id } })
+        });
+        const j = await r.json();
+        state[version].totalEpisodes = j?.data?.Media?.episodes || null;
+      }catch{ /* ignore */ }
+      playCurrent(version);
+    }
+
+    function playCurrent(version){
+      const els = getEls(version);
+      let url = '';
+      if(state[version].type==='tv'){
+        url = `https://player.videasy.net/tv/${state[version].id}/${state[version].season}/${state[version].episode}?nextEpisode=true&autoplayNextEpisode=true&episodeSelector=true&color=8B5CF6`;
+        els.epControls.style.display = '';
+        els.epLabel.textContent = `Season ${state[version].season} • Episode ${state[version].episode}`;
+        els.hint.textContent = state[version].totalEpisodes?`of ${state[version].totalEpisodes}`:'';
+      } else if(state[version].type==='anime'){
+        url = `https://player.videasy.net/anime/${state[version].id}/${state[version].episode}?dub=${state[version].animeDub}`;
+        els.epControls.style.display = '';
+        els.epLabel.textContent = `Episode ${state[version].episode}`;
+        els.hint.textContent = state[version].totalEpisodes?`of ${state[version].totalEpisodes}`:'';
+      }
+      els.openNewTab.href = url || els.openNewTab.href;
+      setPlayer(url, version);
+    }
+
+    function setPlayer(url, version){
+      // Render iframe
+      const els = getEls(version);
+      els.player.src = url;
+    }
+
+    // Episode navigation
+    function nextEpisode(version){
+      if(state[version].type==='tv'){
+        if(state[version].totalEpisodes && state[version].episode >= state[version].totalEpisodes){
+          state[version].season += 1; 
+          state[version].episode = 1; 
+          const els = getEls(version);
+          els.seasonInput.value = String(state[version].season); 
+          fetchSeasonAndPlay(version); 
+          return;
+        }
+        state[version].episode += 1; 
+        playCurrent(version);
+      } else if(state[version].type==='anime'){
+        if(state[version].totalEpisodes && state[version].episode >= state[version].totalEpisodes){ return; }
+        state[version].episode += 1; 
+        playCurrent(version);
+      }
+    }
+
+    function prevEpisode(version){
+      if(state[version].episode>1){ 
+        state[version].episode -= 1; 
+        playCurrent(version); 
+        return; 
+      }
+      if(state[version].type==='tv' && state[version].season>1){ 
+        state[version].season -= 1; 
+        const els = getEls(version);
+        els.seasonInput.value = String(state[version].season); 
+        fetchSeasonAndPlay(version); 
+      }
+    }
+
+    function jumpSeason(val, version){
+      const n = Math.max(1, parseInt(val||'1',10));
+      state[version].season = n; 
+      state[version].episode = 1; 
+      fetchSeasonAndPlay(version);
+    }
+
+    // ===== Auto-next based on VIDEASY postMessage events =====
+    window.addEventListener('message', (event)=>{
+      try{
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if(!data) return;
+        // Expecting: { id, type, progress, timestamp, duration, season, episode }
+        if((data.type==='tv' || data.type==='anime') && (typeof data.progress==='number')){
+          // advance once when >=98%
+          if(data.progress >= 98){
+            const now = Date.now();
+            // Determine which version to update based on the active version
+            const version = window.activeVersion;
+            if(now - state[version].lastAutoAdvance > 3000){
+              state[version].lastAutoAdvance = now;
+              nextEpisode(version);
+            }
+          }
+        } else if(typeof data.timestamp==='number' && typeof data.duration==='number' && data.duration>0){
+          const pct = (data.timestamp/data.duration)*100;
+          if(pct>=98){
+            const now = Date.now();
+            // Determine which version to update based on the active version
+            const version = window.activeVersion;
+            if(now - state[version].lastAutoAdvance > 3000){
+              state[version].lastAutoAdvance = now;
+              nextEpisode(version);
+            }
+          }
+        }
+      }catch(e){ /* ignore parse errors */ }
+    });
+
+    // Minimal HTML escaping for titles
+    function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+  </script>
+</body>
+</html>
